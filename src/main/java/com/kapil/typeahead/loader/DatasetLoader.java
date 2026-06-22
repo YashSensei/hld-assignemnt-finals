@@ -11,11 +11,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -27,6 +27,8 @@ public class DatasetLoader {
     private final SearchQueryRepository searchQueryRepository;
 
     private static final int BATCH_SIZE = 1000;
+    private static final String PRIMARY_DATASET = "dataset.csv";
+    private static final String FALLBACK_DATASET = "default-dataset.csv";
 
     @PostConstruct
     @Transactional
@@ -53,18 +55,22 @@ public class DatasetLoader {
 
         System.out.println("Database is empty. Loading dataset from CSV...");
 
-        try (CSVReader reader = new CSVReader(new InputStreamReader(
-                Objects.requireNonNull(getClass().getClassLoader()
-                        .getResourceAsStream("dataset.csv"))
-        ))) {
+        try (InputStream datasetStream = openDatasetStream();
+             CSVReader reader = new CSVReader(new InputStreamReader(datasetStream))) {
 
             String[] header = reader.readNext();
+            if (header == null) {
+                throw new IllegalStateException("Startup dataset is empty");
+            }
 
             String[] row;
             int count = 0;
             List<SearchQuery> batch = new ArrayList<>(BATCH_SIZE);
 
             while ((row = reader.readNext()) != null) {
+                if (row.length < 2) {
+                    throw new IllegalStateException("Startup dataset row must contain query and count");
+                }
 
                 String query = row[0];
                 long totalCount = Long.parseLong(row[1]);
@@ -109,9 +115,28 @@ public class DatasetLoader {
 
             System.err.println("Error loading dataset: " + e.getMessage());
             e.printStackTrace();
+            throw new IllegalStateException("Unable to load startup dataset", e);
         }
 
         redisTemplate.opsForValue()
                 .set("dataset:loaded","true");
+    }
+
+    private InputStream openDatasetStream() {
+        ClassLoader classLoader = getClass().getClassLoader();
+        InputStream datasetStream = classLoader.getResourceAsStream(PRIMARY_DATASET);
+
+        if (datasetStream != null) {
+            System.out.println("Loading dataset from " + PRIMARY_DATASET);
+            return datasetStream;
+        }
+
+        datasetStream = classLoader.getResourceAsStream(FALLBACK_DATASET);
+        if (datasetStream != null) {
+            System.out.println(PRIMARY_DATASET + " not found. Loading fallback dataset from " + FALLBACK_DATASET);
+            return datasetStream;
+        }
+
+        throw new IllegalStateException("Database is empty and no startup dataset was found");
     }
 }

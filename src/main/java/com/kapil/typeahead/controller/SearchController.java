@@ -42,9 +42,13 @@ public class SearchController {
     @PostMapping("/search")
     public SearchResponse search(@RequestBody SearchRequest request) {
 
-        System.out.println("Search submitted: " + request.getQuery());
+        String query = request != null ? request.getQuery() : null;
 
-        searchService.submitSearch(request.getQuery());
+        String normalizedQuery = searchService.normalizeQuery(query);
+
+        System.out.println("Search submitted: " + normalizedQuery);
+
+        searchService.submitSearch(normalizedQuery);
 
         return new SearchResponse("Searched");
     }
@@ -52,7 +56,8 @@ public class SearchController {
     @GetMapping("/cache/debug")
     public CacheDebugResponse cacheDebug(@RequestParam String prefix) {
 
-        String cacheKey = "suggest:" + prefix.toLowerCase();
+        String normalizedPrefix = prefix == null ? "" : prefix.trim().toLowerCase();
+        String cacheKey = "suggest:" + normalizedPrefix;
         
         RedisNode node = consistentHashingService.getNode(cacheKey);
         StringRedisTemplate template = consistentHashingService.getTemplate(cacheKey);
@@ -61,7 +66,7 @@ public class SearchController {
         String status = cachedResult != null ? "HIT" : "MISS";
         String cacheNode = node != null ? node.getName() : "None";
 
-        return new CacheDebugResponse(prefix, cacheNode, status);
+        return new CacheDebugResponse(normalizedPrefix, cacheNode, status);
     }
 
     @GetMapping("/trending")

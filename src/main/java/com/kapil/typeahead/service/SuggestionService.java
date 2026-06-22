@@ -5,7 +5,11 @@ import com.kapil.typeahead.cache.RedisNode;
 import com.kapil.typeahead.dto.SuggestResponse;
 import com.kapil.typeahead.store.SearchStore;
 import com.kapil.typeahead.trie.Trie;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -15,12 +19,14 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SuggestionService {
 
     private final Trie trie;
     private final SearchStore searchStore;
     private final ConsistentHashingService consistentHashingService;
     private final MetricsService metricsService;
+    private final ObjectMapper objectMapper;
 
     private static final String CACHE_PREFIX = "suggest:";
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
@@ -29,7 +35,13 @@ public class SuggestionService {
         long startTime = System.nanoTime();
         boolean isHit = false;
 
-        String cacheKey = CACHE_PREFIX + prefix.toLowerCase();
+        String normalizedPrefix = prefix == null ? "" : prefix.trim().toLowerCase();
+        if (normalizedPrefix.isBlank()) {
+            metricsService.recordSuggestRequest(false, System.nanoTime() - startTime);
+            return new SuggestResponse(normalizedPrefix, List.of());
+        }
+
+        String cacheKey = CACHE_PREFIX + normalizedPrefix;
 
         StringRedisTemplate template = consistentHashingService.getTemplate(cacheKey);
         String cachedResult = template != null ? template.opsForValue().get(cacheKey) : null;
@@ -39,12 +51,12 @@ public class SuggestionService {
         if (cachedResult != null) {
             isHit = true;
             RedisNode node = consistentHashingService.getNode(cacheKey);
-            System.out.println("Cache HIT for: " + prefix + " on node " + (node != null ? node.getName() : "unknown"));
-            sortedQueries = cachedResult.isEmpty() ? List.of() : List.of(cachedResult.split(","));
+            System.out.println("Cache HIT for: " + normalizedPrefix + " on node " + (node != null ? node.getName() : "unknown"));
+            sortedQueries = parseCachedSuggestions(cachedResult);
         } else {
-            System.out.println("Cache MISS for: " + prefix);
+            System.out.println("Cache MISS for: " + normalizedPrefix);
 
-            List<String> matches = trie.search(prefix.toLowerCase(), 50);
+            List<String> matches = trie.search(normalizedPrefix, 50);
 
             System.out.println("Matches found = " + matches.size());
 
@@ -56,7 +68,7 @@ public class SuggestionService {
             if (template != null) {
                 template.opsForValue().set(
                         cacheKey,
-                        String.join(",", sortedQueries),
+                        serializeSuggestions(sortedQueries),
                         CACHE_TTL
                 );
             }
@@ -69,6 +81,32 @@ public class SuggestionService {
         long duration = System.nanoTime() - startTime;
         metricsService.recordSuggestRequest(isHit, duration);
 
-        return new SuggestResponse(prefix, suggestions);
+        return new SuggestResponse(normalizedPrefix, suggestions);
+    }
+
+    private List<String> parseCachedSuggestions(String cachedResult) {
+        if (cachedResult == null || cachedResult.isEmpty()) {
+            return List.of();
+        }
+
+        if (!cachedResult.stripLeading().startsWith("[")) {
+            return List.of(cachedResult.split(","));
+        }
+
+        try {
+            return objectMapper.readValue(cachedResult, new TypeReference<>() {});
+        } catch (JsonProcessingException ex) {
+            log.warn("Failed to parse cached suggestions", ex);
+            return List.of();
+        }
+    }
+
+    private String serializeSuggestions(List<String> suggestions) {
+        try {
+            return objectMapper.writeValueAsString(suggestions);
+        } catch (JsonProcessingException ex) {
+            log.warn("Failed to serialize suggestions for cache", ex);
+            return "";
+        }
     }
 }
