@@ -2,6 +2,7 @@
 (() => {
     const input = document.getElementById('search-input');
     const suggestionsEl = document.getElementById('suggestions');
+    const searchBox = document.querySelector('.search-box');
     const loadingEl = document.getElementById('loading');
     const errorEl = document.getElementById('error');
     const searchBtn = document.getElementById('search-btn');
@@ -20,9 +21,11 @@
         suggestionsEl.innerHTML = '';
         if (!suggestions || suggestions.length === 0) {
             suggestionsEl.classList.add('hidden');
+            searchBox.classList.remove('has-suggestions');
             return;
         }
         suggestionsEl.classList.remove('hidden');
+        searchBox.classList.add('has-suggestions');
         suggestions.forEach((s, i) => {
             const li = document.createElement('li');
             li.textContent = s;
