@@ -19,54 +19,58 @@
         </div>
     </header>
 
-    <section class="search-box">
-        <div class="input-row">
-            <input id="search-input" type="text" placeholder="Search..." autocomplete="off" />
-            <button id="search-btn">Search</button>
+    <div class="dashboard-grid">
+        <div class="search-column">
+            <section class="search-box">
+                <div class="input-row">
+                    <input id="search-input" type="text" placeholder="Search..." autocomplete="off" />
+                    <button id="search-btn">Search</button>
+                </div>
+
+                <ul id="suggestions" class="suggestions hidden" role="listbox" tabindex="-1"></ul>
+
+                <div id="loading" class="loading hidden">Loading...</div>
+                <div id="error" class="error hidden"></div>
+            </section>
+
+            <section class="trending-strip">
+                <h2>Trending</h2>
+                <ul id="trending-list" class="trending-pills">Loading trending...</ul>
+            </section>
+
+            <section class="result-box">
+                <h2>Results</h2>
+                <ul id="search-results" class="result-list">
+                    <li class="empty-state">No search performed yet.</li>
+                </ul>
+            </section>
         </div>
 
-        <ul id="suggestions" class="suggestions hidden" role="listbox" tabindex="-1"></ul>
-
-        <div id="loading" class="loading hidden">Loading...</div>
-        <div id="error" class="error hidden"></div>
-    </section>
-
-    <div class="content-grid">
-        <section class="results">
-            <h2>Result</h2>
-            <div id="search-result">No search performed yet.</div>
-        </section>
-
-        <section class="trending">
-            <h2>Trending</h2>
-            <ul id="trending-list">Loading trending...</ul>
+        <section class="metrics-panel">
+            <div class="section-heading">
+                <h2>Metrics</h2>
+                <button id="refresh-metrics-btn">Refresh</button>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span class="metric-label">Suggest Cache Hit</span>
+                    <span id="metric-hit-rate" class="metric-value">0.00%</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Avg / p95 Latency</span>
+                    <span id="metric-latency" class="metric-value">0.00ms / 0ms</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Search Requests</span>
+                    <span id="metric-searches" class="metric-value">0</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Write Reduction</span>
+                    <span id="metric-reduction" class="metric-value">0.00%</span>
+                </div>
+            </div>
         </section>
     </div>
-
-    <section class="metrics-panel">
-        <div class="section-heading">
-            <h2>Metrics</h2>
-            <button id="refresh-metrics-btn">Refresh</button>
-        </div>
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <span class="metric-label">Cache Hit Rate</span>
-                <span id="metric-hit-rate" class="metric-value">0.00%</span>
-            </div>
-            <div class="metric-card">
-                <span class="metric-label">Avg / p95 Latency</span>
-                <span id="metric-latency" class="metric-value">0.00ms / 0ms</span>
-            </div>
-            <div class="metric-card">
-                <span class="metric-label">Search Requests</span>
-                <span id="metric-searches" class="metric-value">0</span>
-            </div>
-            <div class="metric-card">
-                <span class="metric-label">Write Reduction</span>
-                <span id="metric-reduction" class="metric-value">0.00%</span>
-            </div>
-        </div>
-    </section>
 </main>
 
 <script src="app.js"></script>

@@ -3,6 +3,7 @@ package com.kapil.typeahead.controller;
 import com.kapil.typeahead.cache.ConsistentHashingService;
 import com.kapil.typeahead.cache.RedisNode;
 import com.kapil.typeahead.dto.SearchResponse;
+import com.kapil.typeahead.dto.SearchResultsResponse;
 import com.kapil.typeahead.dto.SuggestResponse;
 import com.kapil.typeahead.service.MetricsService;
 import com.kapil.typeahead.service.SearchService;
@@ -51,6 +52,11 @@ public class SearchController {
         searchService.submitSearch(normalizedQuery);
 
         return new SearchResponse("Searched");
+    }
+
+    @GetMapping("/results")
+    public SearchResultsResponse results(@RequestParam String q) {
+        return searchService.searchResults(q);
     }
 
     @GetMapping("/cache/debug")

@@ -6,13 +6,14 @@
     const loadingEl = document.getElementById('loading');
     const errorEl = document.getElementById('error');
     const searchBtn = document.getElementById('search-btn');
-    const resultEl = document.getElementById('search-result');
+    const searchResultsEl = document.getElementById('search-results');
     const trendingList = document.getElementById('trending-list');
 
     let suggestions = [];
     let selIndex = -1;
     let controller = null;
     let debounceTimer = null;
+    let searchRequestId = 0;
 
     function showLoading(show) { loadingEl.classList.toggle('hidden', !show); }
     function showError(msg) { if (msg) { errorEl.textContent = msg; errorEl.classList.remove('hidden'); } else { errorEl.classList.add('hidden'); errorEl.textContent = ''; } }
@@ -128,11 +129,13 @@
 
     function submitSearch(query) {
         if (!query || query.trim().length === 0) {
-            resultEl.textContent = 'Please type a query.';
+            showError('Please type a query.');
             return;
         }
+        const requestId = ++searchRequestId;
         showLoading(true);
         showError(null);
+        recordSuggestCache(query);
         fetch('/api/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -142,17 +145,71 @@
                 if (!res.ok) throw new Error('Search failed: ' + res.status);
                 return res.json();
             })
-            .then(data => {
-                // SearchResponse in controller returns { message: "Searched" }
-                resultEl.textContent = data && data.message ? data.message : 'Search submitted';
+            .then(() => {
+                loadSearchResults(query, requestId);
                 fetchMetrics();
-                setTimeout(fetchMetrics, 5500); // refresh after buffer flush
+                setTimeout(() => {
+                    loadSearchResults(query, requestId);
+                    fetchMetrics();
+                }, 5500); // refresh after buffer flush
             })
             .catch(err => {
                 showError('Search failed');
                 console.error(err);
             })
             .finally(() => { showLoading(false); });
+    }
+
+    function recordSuggestCache(query) {
+        fetch(`/api/suggest?q=${encodeURIComponent(query)}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Suggest cache probe failed: ' + res.status);
+                return res.json();
+            })
+            .then(fetchMetrics)
+            .catch(err => console.error('Error recording suggest cache metrics:', err));
+    }
+
+    function loadSearchResults(query, requestId = searchRequestId) {
+        if (!searchResultsEl || !query || query.trim().length === 0) return;
+
+        searchResultsEl.innerHTML = '<li class="empty-state">Loading results...</li>';
+
+        fetch(`/api/results?q=${encodeURIComponent(query)}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Results request failed: ' + res.status);
+                return res.json();
+            })
+            .then(data => {
+                if (requestId !== searchRequestId) return;
+                const list = data && Array.isArray(data.results) ? data.results : [];
+                searchResultsEl.innerHTML = '';
+
+                if (list.length === 0) {
+                    searchResultsEl.innerHTML = '<li class="empty-state">No database results found.</li>';
+                    return;
+                }
+
+                list.forEach(item => {
+                    const li = document.createElement('li');
+
+                    const text = document.createElement('span');
+                    text.className = 'result-text';
+                    text.textContent = item.text || item.query || JSON.stringify(item);
+
+                    const count = document.createElement('span');
+                    count.className = 'result-count';
+                    count.textContent = `${item.count || 0} searches`;
+
+                    li.append(text, count);
+                    searchResultsEl.appendChild(li);
+                });
+            })
+            .catch(err => {
+                if (requestId !== searchRequestId) return;
+                searchResultsEl.innerHTML = '<li class="empty-state">Unable to load database results.</li>';
+                console.error(err);
+            });
     }
 
     function loadTrending() {
@@ -169,7 +226,8 @@
                 list.forEach(item => {
                     const li = document.createElement('li');
                     const text = item.query ? item.query : JSON.stringify(item);
-                    const scoreText = item.score !== undefined ? ` - Score: ${item.score.toFixed(1)}` : (item.count ? ` - ${item.count}` : '');
+                    const scoreText = item.score !== undefined ? ` (${item.score.toFixed(1)})` : (item.count ? ` (${item.count})` : '');
+                    li.title = text + scoreText;
                     li.textContent = text + scoreText;
                     trendingList.appendChild(li);
                 });

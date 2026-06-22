@@ -15,6 +15,8 @@ public interface SearchQueryRepository extends JpaRepository<SearchQuery, Long> 
 
     Optional<SearchQuery> findByQueryText(String queryText);
 
+    List<SearchQuery> findTop10ByQueryTextContainingIgnoreCaseOrderByCountDesc(String queryText);
+
     @Modifying
     @Query("UPDATE SearchQuery s SET s.count = s.count + :delta, s.lastUpdated = CURRENT_TIMESTAMP WHERE s.queryText = :queryText")
     void incrementCount(@Param("queryText") String queryText, @Param("delta") long delta);
