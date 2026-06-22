@@ -166,7 +166,7 @@
                 list.forEach(item => {
                     const li = document.createElement('li');
                     const text = item.query ? item.query : JSON.stringify(item);
-                    const scoreText = item.score !== undefined ? ` — Score: ${item.score.toFixed(1)}` : (item.count ? ` — ${item.count}` : '');
+                    const scoreText = item.score !== undefined ? ` - Score: ${item.score.toFixed(1)}` : (item.count ? ` - ${item.count}` : '');
                     li.textContent = text + scoreText;
                     trendingList.appendChild(li);
                 });
